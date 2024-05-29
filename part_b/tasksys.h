@@ -2,6 +2,13 @@
 #define _TASKSYS_H
 
 #include "itasksys.h"
+#include <thread>
+#include <mutex>
+#include <queue>
+#include <vector>
+#include <list>
+#include <unordered_set>
+#include <condition_variable>
 
 /*
  * TaskSystemSerial: This class is the student's implementation of a
@@ -60,6 +67,38 @@ class TaskSystemParallelThreadPoolSpinning: public ITaskSystem {
  * itasksys.h for documentation of the ITaskSystem interface.
  */
 class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
+    private:
+        int num_threads;
+        std::thread* workers;
+        bool stop;
+
+        TaskID next_task_id;
+
+        struct Task {
+            TaskID task_id;
+            IRunnable* task_ptr;
+            std::vector<TaskID> deps;
+            int num_total_tasks;
+            int num_allocated_tasks;
+            int num_done_tasks;
+            std::mutex mtx;
+
+            Task(TaskID task_id, int num_total_tasks,
+                 IRunnable* task_ptr, std::vector<TaskID> deps);
+        };
+
+        std::queue<Task*> ready_queue;
+        std::list<Task*> waiting_list;
+        std::unordered_set<Task*> working_set;
+        std::unordered_set<TaskID> completed_set;
+        std::mutex mutex_ready_queue, mutex_waiting_list;
+        std::mutex mutex_working_set, mutex_completed_set;
+        std::condition_variable cv_work, cv_done;
+        std::mutex mutex_done;
+
+        void entry();
+        void check_waiting_list();
+        void check_done();
     public:
         TaskSystemParallelThreadPoolSleeping(int num_threads);
         ~TaskSystemParallelThreadPoolSleeping();
